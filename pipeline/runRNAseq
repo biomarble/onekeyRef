@@ -1,0 +1,98 @@
+#!/bin/env python3
+import os
+import time
+scriptdir=os.path.dirname(os.path.realpath(__file__)).strip()
+
+try:
+    name = os.environ['CONDA_DEFAULT_ENV']
+except:
+    print("\n请激活RNAseqWithRef环境:\n")
+    print("conda activate RNAseqWithRef\n")
+    os._exit(0)
+
+try:
+    import yaml
+except ImportError:
+    print("请重新安装RNAseqWithRef环境!\n")
+    print("conda deactivate")
+    print("conda remove -n RNAseqWithRef --all")
+    print("conda env create -f ",scriptdir,"/RNAseqWithRef.yml\n",sep="")
+    os._exit(0)
+    
+try:
+    yamlfile =open('configs/config.yaml') 
+    config = yaml.load(yamlfile,Loader=yaml.FullLoader)
+    yamlfile.close()
+except Exception as reason:
+    print("\n错误!")
+    print("./configs/config.yaml 不存在!!!!\n")
+    print("请检查当前目录下是否存在configs和data两个目录")
+    print("并检查输入文件是否存放妥当\n")
+    os._exit(0)
+
+qc = config["QC"]
+print("\n是否运行QC步骤?\n", qc)
+trim = config["TRIMMED"]
+print("是否运行Trim步骤?\n", trim)
+deg = config["DEG"]
+cores =str(config["NCORE"])
+print("是否运行差异基因分析?\n", deg)
+print("\n请仔细检查上述参数，是否正确？\n输入y回车继续\n输入n回车终止运行\n")
+check_flow = input()
+if check_flow == "y":
+    pass
+else:
+    os._exit(0)
+
+if not os.path.exists("logs"):
+   os.makedirs('logs') 
+file_log_time = open("logs/log_pipeline.txt", "a+")
+file_log_time.write("任务起始时间: " + time.ctime() + "\n")
+
+pipeline_start_time=time.time()
+
+def spend_time(start_time, end_time):
+    seconds = end_time - start_time
+    hours = seconds // 3600
+    seconds %= 3600
+    minutes = seconds // 60
+    seconds %= 60
+    return "%d:%02d:%02d" % (hours, minutes, seconds)
+
+if qc:
+    print("开始QC步骤...")
+    start_time = time.time()
+    os.system("nice -5 snakemake -j " + cores + " -s " + scriptdir + "/workflow/QC.rules 2>&1 | tee logs/log_QC.txt")
+    end_time = time.time()
+    file_log_time.write("QC分析花费时间: " + spend_time(start_time, end_time) + "\n")
+    print("QC步骤运行结束!\n 请检查QC结果，判断是否需要对Reads进行Trimming步骤\n 如需进行Trimming及后续分析，请将configs/config.yaml文件中QC步骤设置为off!\n")
+    os._exit(0)
+else:
+    if trim:
+        print("开始Trimming步骤...")
+        start_time = time.time()
+        os.system("nice -5 snakemake  -j " + cores + " -s " + scriptdir + "/workflow/trim.rules 2>&1 | tee logs/log_trim.txt")
+        end_time = time.time()
+        file_log_time.write("trimming分析花费时间:" + spend_time(start_time, end_time) + "\n")
+        print("Trimming结束!")
+    else:
+        print("Trimming步骤已跳过")
+
+start_time = time.time()
+os.system("nice -5 snakemake  -j " + cores + " -s  " + scriptdir + "/workflow/quantify.rules 2>&1 | tee logs/log_quantify.txt")
+end_time = time.time()
+file_log_time.write("比对定量分析花费时间: " + spend_time(start_time, end_time) + "\n")
+
+if deg:
+    print("开始差异表达分析步骤...")
+    start_time = time.time()
+    os.system("nice -5 snakemake -j " + cores + "  -s  " + scriptdir + "/workflow/deg.rules 2>&1 | tee logs/log_deseq2.txt")
+    end_time = time.time()
+    file_log_time.write("差异表达分析花费时间 :" + spend_time(start_time, end_time) + "\n")
+    print("差异表达分析结束!")
+else:
+    print("差异表达分析步骤已跳过")
+pipeline_end_time = time.time()
+print("流程运行结束，请留意程序运行结果是否有误！\n共花费"+spend_time(pipeline_start_time,pipeline_end_time)+"\n")
+file_log_time.write("结束分析时间: " + time.ctime() + "\n")
+file_log_time.close()

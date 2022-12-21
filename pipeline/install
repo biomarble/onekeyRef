@@ -1,0 +1,26 @@
+#!/bin/bash
+if [  ! -e /opt ]
+then
+mkdir /opt
+fi
+
+DIR=$(cd `dirname $BASH_SOURCE`;pwd)
+
+cp -r $DIR  /opt/RNAseqWithRef
+ln -snf /opt/RNAseqWithRef/runRNAseq  /usr/local/bin/
+
+if [ $? -ne 0 ]
+then
+	echo ""
+	echo "安装失败!! 请检查是否使用sudo运行"
+	echo ""
+else
+	if [ -e /usr/local/bin/runRNAseq ]
+	then
+		echo "安装成功!"
+		echo "软件安装路径: /opt/RNAseqWithRef"
+	else
+		echo "安装失败!"
+		echo "请检查是否使用sudo运行"
+	fi
+fi

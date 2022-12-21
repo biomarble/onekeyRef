@@ -1,0 +1,52 @@
+import pandas as pd
+configfile: "configs/config.yaml"
+basedir = os.path.abspath(".")
+
+input_path = basedir + "/" +config["READSPATH"]
+samples = pd.read_csv(config["SAMPLEINFO"], sep = '\t', header = 0)['sample']
+tmp_path =  basedir + "/" + config["OUTPUTPATH"] + "/trim"
+final_path =  basedir + "/" + config["FINALOUTPUT"]
+
+def trimFiles(wildcards):
+        forward_trim = expand(final_path + "/0.trimmedReads/{sample}.R1.fq.gz", sample = samples)
+        return forward_trim
+
+rule all:
+    input:
+        report = final_path + "/0.trimmedReads/report_quality_control_after_trimming.html"
+
+rule getReads:
+    output:
+        forward = temp(tmp_path + "/reads/{sample}_forward.fq.gz"),
+        reversed = temp(tmp_path + "/reads/{sample}_reverse.fq.gz")
+    params:
+        input_path = input_path
+    shell:
+        "ln -s {params.input_path}/{wildcards.sample}.*R1*.f*q.gz {output.forward}"
+        " && ln -s {params.input_path}/{wildcards.sample}.*R2*.f*q.gz {output.reversed}"
+        
+rule trim:
+    input:
+        forward = tmp_path + "/reads/{sample}_forward.fq.gz",
+        reversed = tmp_path + "/reads/{sample}_reverse.fq.gz"
+    output:
+        read_trim1= final_path + "/0.trimmedReads/{sample}.R1.fq.gz",
+        read_trim2= final_path + "/0.trimmedReads/{sample}.R2.fq.gz"
+    params:
+        outputpath = tmp_path,
+        read_trim_forward = tmp_path + "/{sample}_val_1.fq.gz",
+        read_trim_reverse = tmp_path + "/{sample}_val_2.fq.gz"
+    shell:
+        "trim_galore --fastqc -j 4 --paired --basename {wildcards.sample} -o {params.outputpath} {input.forward} {input.reversed} && "
+        "mv {params.read_trim_forward} {output.read_trim1} && "
+        "mv {params.read_trim_reverse} {output.read_trim2} "
+
+rule summaryReport:
+    input:
+        trimFiles
+    output:
+        report = final_path + "/0.trimmedReads/report_quality_control_after_trimming.html"
+    params:
+        path = tmp_path
+    shell:
+        "multiqc {params.path} --filename {output.report}"

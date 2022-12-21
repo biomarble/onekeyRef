@@ -1,0 +1,17 @@
+configfile: "configs/config.yaml"
+basedir = os.path.abspath(".")
+scriptdir=workflow.basedir + "/.."
+input_path = basedir + "/" + config["FINALOUTPUT"] + "/2.expression/all.sample.count.tsv"
+output_path = basedir+ "/" + config["FINALOUTPUT"] + "/3.DEG"
+control = config["CONTROL"][0]
+treat = config["TREAT"][0]
+rule all:
+    input:
+        deg = output_path + "/" + control + ".vs." + treat + ".DEG.tsv"
+rule DEGanalysis:
+    input:
+        input_path
+    output:
+        deg = output_path + "/" + control + ".vs." + treat + ".DEG.tsv"
+    shell:
+        "Rscript {scriptdir}/scripts/DEGanalysis.R"

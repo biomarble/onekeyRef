@@ -1,0 +1,43 @@
+import pandas as pd
+configfile: "configs/config.yaml"
+basedir = os.path.abspath(".")
+samples = pd.read_csv(config["SAMPLEINFO"], sep = '\t', header = 0)['sample']
+input_path = basedir + "/" +config["READSPATH"]
+tmp_path =basedir + "/" + config["OUTPUTPATH"] 
+final_path = basedir + "/" + config["FINALOUTPUT"] 
+rule end:
+    input:
+        report = final_path + "/0.QC/report_quality_control.html"
+rule getReads:
+    output:
+        forward = temp(tmp_path + "/reads/{sample}_forward.fq.gz"),
+        reverse = temp(tmp_path + "/reads/{sample}_reverse.fq.gz")
+    params:
+        input_path = input_path
+    shell:
+        "ln -s {params.input_path}/{wildcards.sample}.*R1*.f*q.gz {output.forward}"
+        " && ln -s {params.input_path}/{wildcards.sample}.*R2*.f*q.gz {output.reverse}"
+        
+rule qualityControl:
+    input:
+        forward = tmp_path + "/reads/{sample}_forward.fq.gz",
+        reverse = tmp_path + "/reads/{sample}_reverse.fq.gz"
+    output:
+        fastqc_forward = final_path + "/0.QC/{sample}_forward_fastqc.html",
+        fastqc_reverse = final_path + "/0.QC/{sample}_reverse_fastqc.html"
+    params:
+        outputpath = final_path + "/0.QC"
+    shell:
+        "fastqc -t $(({config[NCORE]}+0)) -o {params.outputpath} {input.forward} && "
+        "fastqc -t $(({config[NCORE]}+0)) -o {params.outputpath} {input.reverse}"
+        
+rule summaryReport:
+    input:
+        fastqc_forward = expand(final_path + "/0.QC/{sample}_forward_fastqc.html", sample = samples),
+        fastqc_reverse = expand(final_path + "/0.QC/{sample}_reverse_fastqc.html", sample = samples)
+    output:
+        report = final_path + "/0.QC/report_quality_control.html"
+    params:
+        path = final_path + "/0.QC"
+    shell:
+        "multiqc {params.path} --filename {output.report}"

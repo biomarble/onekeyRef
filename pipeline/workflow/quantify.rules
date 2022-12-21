@@ -1,0 +1,124 @@
+import pandas as pd
+configfile: "configs/config.yaml"
+
+basedir = os.path.abspath(".")
+scriptdir=workflow.basedir + "/.."
+
+samples = pd.read_csv(config["SAMPLEINFO"], sep = '\t', header = 0)['sample']
+
+tmp_path =  basedir + "/" + config["OUTPUTPATH"] 
+final_path =  basedir + "/" + config["FINALOUTPUT"]
+
+trimmed = config["TRIMMED"]
+if trimmed:
+    input_path = final_path + "/0.trimmedReads"
+else:
+    input_path = basedir + "/" +  config["READSPATH"]
+
+rule end:
+    input:
+        mapstat= final_path + "/1.mapping/MapStat.tsv",
+        mergefile= final_path + "/2.expression/all.sample.count.tsv",
+        fpkm= final_path + "/2.expression/all.sample.FPKM.tsv",
+        tpm= final_path + "/2.expression/all.sample.TPM.tsv",
+        fpkmCor= final_path + "/2.expression/Sample.CorCoef.tsv",
+
+rule getReads:
+    output:
+        forward = temp(tmp_path + "/reads/{sample}_forward.fastq.gz"),
+        reversed = temp(tmp_path + "/reads/{sample}_reverse.fastq.gz")
+    params:
+        input_path = input_path
+    shell:
+        "ln -s {params.input_path}/{wildcards.sample}.*R1*.f*q.gz {output.forward}"
+        " && ln -s {params.input_path}/{wildcards.sample}.*R2*.f*q.gz {output.reversed}"
+
+rule indexGenome:
+    input:
+        genome = config["GENOME"]
+    output:
+        indexes = directory(tmp_path + "/indexes"),
+        splicesites = tmp_path + "/splicesites.txt"
+    params:
+        index = tmp_path + "/indexes/index"
+    shell:
+        "mkdir {output.indexes} && hisat2-build -p {config[NCORE]} {input.genome} {params.index}"
+        "&& hisat2_extract_splice_sites.py {config[ANNOTATION]} > {output.splicesites}"
+
+rule alignment:
+    input:
+        indexes = tmp_path + "/indexes",
+        splicesites = tmp_path + "/splicesites.txt",
+        forward = tmp_path + "/reads/{sample}_forward.fastq.gz",
+        reversed = tmp_path + "/reads/{sample}_reverse.fastq.gz"
+    output:
+        sam = temp(tmp_path + "/samFile/{sample}.sam"),
+        bam = temp(tmp_path + "/1.mapping/{sample}.bam"),
+    params:
+        index = tmp_path + "/indexes/index"
+    run:
+        shell("hisat2 -p {config[NCORE]} --known-splicesite-infile {input.splicesites} -x {params.index} -1 {input.forward} -2 {input.reversed} -S {output.sam}")
+        shell("samtools view -@ {config[NCORE]} -b -S {output.sam} > {output.bam}")
+rule sortBAM:
+    input:
+        bam = tmp_path + "/1.mapping/{sample}.bam"
+    output:
+        sort = final_path + "/1.mapping/{sample}.sort.bam",
+        sortindex = final_path + "/1.mapping/{sample}.sort.bam.bai"
+    shell:
+        "samtools sort -@ {config[NCORE]} {input.bam} -o {output.sort} && "
+        "samtools index {output.sort}"
+
+rule flagBAM:
+    input:
+        bam = final_path + "/1.mapping/{sample}.sort.bam"
+    output:
+        flag = final_path + "/1.mapping/{sample}.stat"
+    shell:
+        "samtools flagstat {input.bam} >{output.flag}"
+rule mergeflag:
+    input:
+       flag_summary = expand(final_path + "/1.mapping/{sample}.stat", sample = samples)
+    output:
+        mapstat= final_path + "/1.mapping/MapStat.tsv"
+    params:
+        mapdir=final_path + "/1.mapping/"
+    shell:
+        "perl {scriptdir}/scripts/flagstat.pl  {params.mapdir} >{output.mapstat}"
+
+rule featureCount:
+    input:
+        sort = final_path + "/1.mapping/{sample}.sort.bam",
+        sortindex = final_path + "/1.mapping/{sample}.sort.bam.bai",
+        annotation = config["ANNOTATION"]
+    output:
+        countfile = final_path + "/2.expression/{sample}_count.tsv",
+        count_summary = final_path + "/2.expression/{sample}_count.raw"
+    shell:
+        "htseq-count -r pos -f bam -i  {config[ATTRIBUTE]} -s no -t exon {input.sort}  {input.annotation} > {output.count_summary} && sed '/^__/ d' {output.count_summary} > {output.countfile}"
+rule merge:
+    input:
+        count_summary = expand(final_path + "/2.expression/{sample}_count.raw", sample = samples)
+    output:
+        mergefile= final_path + "/2.expression/all.sample.count.tsv"
+    params:
+        countdir=final_path + "/2.expression/"
+    shell:
+        "perl {scriptdir}/scripts/mergeEXPdir.pl  {params.countdir} "
+rule counts2FpkmTpm:
+    input:
+        mergefile= final_path + "/2.expression/all.sample.count.tsv",
+        annotation = config["ANNOTATION"]
+    output:
+        fpkm= final_path + "/2.expression/all.sample.FPKM.tsv",
+        tpm= final_path + "/2.expression/all.sample.TPM.tsv"
+    shell:
+        "perl {scriptdir}/scripts/counts2fpkm.gtf.pl  {input.mergefile}  {input.annotation}  >{output.fpkm} &&"
+        "perl {scriptdir}/scripts/counts2tpm.gtf.pl  {input.mergefile}  {input.annotation}  >{output.tpm}"
+rule CorrCoef:
+    input:
+        fpkm= final_path + "/2.expression/all.sample.FPKM.tsv",
+    output:
+        Cor= final_path + "/2.expression/Sample.CorCoef.tsv",
+    shell:
+        "Rscript {scriptdir}/scripts/corr.R "

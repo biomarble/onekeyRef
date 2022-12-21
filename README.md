@@ -16,3 +16,8 @@ conda  activate RNAseqWithRef
 cd /mnt/d/workshop/2.IlluminaRNA-seq/one-key-pipeline/testData
 runRNAseq
 ```
+
+### 测试数据
+
+百度网盘[链接](https://pan.baidu.com/s/1uwgKlS6JtNp8FqjF6E-ZZw?pwd=kjyt)
+

@@ -1,0 +1,24 @@
+name: RNAseqWithRef
+channels:
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/bioconda
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
+dependencies:
+  - python=3.8.5
+  - snakemake=5.27.4
+  - yaml=0.2.5
+  - trim-galore=0.6.6
+  - cutadapt=2.10
+  - fastqc=0.11.9
+  - samtools=1.11
+  - hisat2=2.2.1
+  - htseq=0.12.4
+  - qualimap=2.2.2d
+  - multiqc=1.9=pyh9f0ad1d_0
+  - r-dplyr=1.0.2
+  - r-yaml=2.2.1
+  - bioconductor-deseq2=1.30.0
+  - bioconductor-ebseq=1.30.0
+  - bioconductor-topgo=2.42.0

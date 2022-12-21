@@ -1,0 +1,40 @@
+#==================================#
+#   有参考基因组的RNAseq分析流程   #
+#        程序运行配置文件          #
+#==================================#
+
+
+#================输入数据路径=================#
+READSPATH:   data/fq                          #reads 所在目录，reads文件名命名规则，样本名.R1.fq.gz和样本名.R2.fq.gz
+SAMPLEINFO:  configs/sampleInfo.tsv           #样本信息文件，第一列为样本名，第二列为样本分组。样本名需要与reads文件名对应
+GENOME:      data/genome/genome.fa            #基因组序列fasta文件
+ANNOTATION:  data/genome/genes.gtf            #基因注释gtf文件
+
+#================输出路径=====================#
+OUTPUTPATH:  tmp                              #临时目录名称，存放临时文件
+FINALOUTPUT: output                           #最终输出目录名称，存放最后结果
+
+#==================步骤控制===================#
+#可选填yes或no，yes表示运行此步骤，no表示跳过
+QC:          no                               #是否运行fastqc质控步骤，QC结束后流程会终止以备检查分析结果。如需运行其他步骤，请将QC设置为no
+TRIMMED:     no                               #fastq数据是否需要去除接头与低质量reads。低质量reads过滤标准：Q20以下base超过10%，或去接头后长度大于20bp
+DEG:         yes                              #是否需要运行差异分析
+
+#===============差异分析参数==================#
+#有生物学重复差异分析自动选择DESeq2，无生物学重复差异分析自动选择EBseq，无需指定
+
+#例如：
+#使用FDR<0.05且FC>2 为阈值，做如下差异分析
+#Control1 vs. Treat1
+#Control2 vs. Treat2
+#Control1 vs. Treat2
+
+CONTROL:     ["Control1","Control2","Control1"]  #差异分析对照组组名
+TREAT:       ["Treat1","Treat2","Treat2"]        #差异分析实验组组名（顺序与对照组组名对应）
+useFDR:      yes                                 #no为用p值提取差异，yes为用FDR提取差异
+cut:         0.05                                #p值/FDR值的显著性阈值
+FCcut:       2                                   #Fold Change 阈值
+
+#=================其他参数====================#
+NCORE:       4                                #分析使用线程数，不要大于实际可用线程数。可用如下命令检查可用线程数：getconf _NPROCESSORS_ONLN
+ATTRIBUTE:   gene_id                          #gtf中的基因ID标签名，一般不需要修改。

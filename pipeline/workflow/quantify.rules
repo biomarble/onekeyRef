@@ -84,7 +84,7 @@ rule mergeflag:
     params:
         mapdir=final_path + "/1.mapping/"
     shell:
-        "perl {scriptdir}/scripts/flagstat.pl  {params.mapdir} >{output.mapstat}"
+        "perl {scriptdir}/scripts/flagstat.pl  {params.mapdir}/*.stat >{output.mapstat}"
 
 rule featureCount:
     input:

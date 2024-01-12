@@ -10,31 +10,31 @@ rule end:
         report = final_path + "/0.QC/report_quality_control.html"
 rule getReads:
     output:
-        forward = temp(tmp_path + "/reads/{sample}_forward.fq.gz"),
-        reverse = temp(tmp_path + "/reads/{sample}_reverse.fq.gz")
+        forfq = temp(tmp_path + "/reads/{sample}_R1.fq.gz"),
+        revfq = temp(tmp_path + "/reads/{sample}_R2.fq.gz")
     params:
         input_path = input_path
     shell:
-        "ln -s {params.input_path}/{wildcards.sample}.*R1*.f*q.gz {output.forward}"
-        " && ln -s {params.input_path}/{wildcards.sample}.*R2*.f*q.gz {output.reverse}"
+        "    ln -s {params.input_path}/{wildcards.sample}.*R1*.f*q.gz {output.forfq} "
+        " && ln -s {params.input_path}/{wildcards.sample}.*R2*.f*q.gz {output.revfq}"
         
 rule qualityControl:
     input:
-        forward = tmp_path + "/reads/{sample}_forward.fq.gz",
-        reverse = tmp_path + "/reads/{sample}_reverse.fq.gz"
+        forfq = tmp_path + "/reads/{sample}_R1.fq.gz",
+        revfq = tmp_path + "/reads/{sample}_R2.fq.gz"
     output:
-        fastqc_forward = final_path + "/0.QC/{sample}_forward_fastqc.html",
-        fastqc_reverse = final_path + "/0.QC/{sample}_reverse_fastqc.html"
+        fastqc_forward = final_path + "/0.QC/{sample}_R1_fastqc.html",
+        fastqc_reverse = final_path + "/0.QC/{sample}_R2_fastqc.html"
     params:
         outputpath = final_path + "/0.QC"
     shell:
-        "fastqc -t $(({config[NCORE]}+0)) -o {params.outputpath} {input.forward} && "
-        "fastqc -t $(({config[NCORE]}+0)) -o {params.outputpath} {input.reverse}"
+        "fastqc -t $(({config[NCORE]}+0)) -o {params.outputpath} {input.forfq} && "
+        "fastqc -t $(({config[NCORE]}+0)) -o {params.outputpath} {input.revfq}"
         
 rule summaryReport:
     input:
-        fastqc_forward = expand(final_path + "/0.QC/{sample}_forward_fastqc.html", sample = samples),
-        fastqc_reverse = expand(final_path + "/0.QC/{sample}_reverse_fastqc.html", sample = samples)
+        fastqc_forward = expand(final_path + "/0.QC/{sample}_R1_fastqc.html", sample = samples),
+        fastqc_reverse = expand(final_path + "/0.QC/{sample}_R2_fastqc.html", sample = samples)
     output:
         report = final_path + "/0.QC/report_quality_control.html"
     params:
